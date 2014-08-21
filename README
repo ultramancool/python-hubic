@@ -1,13 +1,13 @@
-Simple ftp-like command line for hubic (https://hubic.com/)
-(c) 2013 Antoine Sirinelli <antoine@monte-stello.com>
+Simple CLI uploader for hubic (https://hubic.com/)
+Originally (c) 2013 Antoine Sirinelli <antoine@monte-stello.com>
+Modified.
 
 Licence: GPLv2+
 
 To run it, follow the procedure:
-$ virtualenv virtual
-$ source ./virtual/bin/activate
 $ pip install -r requirements.txt 
-$ ./hubic_ftp me@example.com
+$ python authenticate.py user password
+$ python upload.py storage_url auth_token file
 
 Enjoy.
 
