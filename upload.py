@@ -7,6 +7,8 @@ import json
 from base64 import b64decode
 import sys
 import os
+from swiftclient import Connection
+
 
 class auth_hubic:
     def __init__(self, user, passwd):
@@ -52,12 +54,19 @@ class auth_hubic:
         r = requests.get(self.SessionHandler + 'rest.dispatcher/' + 'logout',
                          params=payload)
 
-if (len(sys.argv) < 3):
-	print "usage: script user password"
+if (len(sys.argv) < 4):
+	print "usage: script user password file"
 	sys.exit(1)
 
 user = sys.argv[1]
 passwd = sys.argv[2]
 hubic = auth_hubic(user, passwd)
 storage_url, auth_token = hubic.get_credentials()
-print storage_url, auth_token
+
+options = {'auth_token': auth_token,
+           'object_storage_url': storage_url}
+conn = Connection(os_options=options, auth_version=2)
+
+conn.put_object("default/", os.path.basename(sys.argv[3]), open(sys.argv[3],'rb'))
+
+hubic.logout()
