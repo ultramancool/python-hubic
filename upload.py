@@ -1,72 +1,73 @@
 #!/usr/bin/env python
-# originally (c) 2013 Antoine Sirinelli <antoine@monte-stello.com>
-# hacked up a bunch after that though. 
+# this code hacked off https://github.com/alkivi-sas/duplicity-hubic/blob/github/hubicbackend.py
 
 import requests
 import json
-from base64 import b64decode
 import sys
 import os
 from swiftclient import Connection
+import base64
+
+session = requests.session()
+
+def get_access_token(client_id, client_secret, refresh_token):
+
+    # Fix headers
+    credentials = '%s:%s' % (client_id, client_secret)
+    encoded_credentials = base64.b64encode(credentials)
+
+    session.headers.update({
+        'Authorization': 'Basic %s' % encoded_credentials,
+        'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8'
+    })
+
+    # Call api
+    url = 'https://api.hubic.com/oauth/token/'
+    data = 'refresh_token=%s&grant_type=refresh_token' % refresh_token
+    r = session.post(url, data=data)
+    if r.status_code == 200:
+        data = json.loads(r.content)
+        return data['access_token']
+    else:
+        raise Exception('Got status_code %d in getAccessToken on url %s. Reason: %s' % (r.status_code, url, r.text))
 
 
-class auth_hubic:
-    def __init__(self, user, passwd):
-        self.SessionHandler = 'https://ws.ovh.com/sessionHandler/r4/'
-        self.hubicws = 'https://ws.ovh.com/hubic/r5/'
+def get_open_stack_credentials(access_token):
+    # Fix authentification headers
+    session.headers.update({'Authorization': 'Bearer %s' % access_token})
 
-        r = requests.get(self.SessionHandler + 'rest.dispatcher/' + 'getAnonymousSession')
-        sessionId = r.json()['answer']['session']['id']
+    # Call api
+    url = 'https://api.hubic.com/1.0/account/credentials'
+    r = session.get(url)
+    if r.status_code == 200:
+        import json
+        data = json.loads(r.content)
+        return data
+    else:
+        raise Exception('Got status_code %d in getOpenStackCredentials on url %s. Reason: %s' %
+                        (r.status_code, url, r.text))
 
-        params = { 'sessionId': sessionId,
-                   'email': user}
-        payload = {'params': json.dumps(params)}
+def get_credentials(client_id, client_secret,refresh_token):
+    access_token = get_access_token(
+        client_id=client_id,
+        client_secret=client_secret,
+        refresh_token=refresh_token,
+    )
+    credentials = get_open_stack_credentials(access_token=access_token)
+    conn_kwargs = {}
+    if ('endpoint' in credentials) and ('token' in credentials):
+        conn_kwargs['preauthurl'] = credentials['endpoint']
+        conn_kwargs['preauthtoken'] = credentials['token']
+    else:
+        print "Asplod"
 
-        r = requests.get(self.hubicws + 'rest.dispatcher/' + 'getHubics',
-                         params=payload)
-        hubics = r.json()
-        self.hubicsId = hubics['answer'][0]['id']
+    conn_kwargs['auth_version'] = '1'
 
-        params = { 'login': hubics['answer'][0]['nic'],
-                   'password': passwd,
-                   'context': 'hubic'}
-        payload = {'params': json.dumps(params)}
+    conn = Connection(**conn_kwargs)
+    return conn
 
-        r = requests.get(self.SessionHandler + 'rest.dispatcher/' + 'login',
-                         params=payload)
+if len(sys.argv) < 5:
+    print "Wrong args. Use: client_id client_secret refresh_token"
 
-        self.sessionId = r.json()['answer']['session']['id']
-
-    def get_credentials(self):
-        params = { 'sessionId': self.sessionId,
-                   'hubicId': self.hubicsId}
-        payload = {'params': json.dumps(params)}
-
-        r = requests.get(self.hubicws + 'rest.dispatcher/' + 'getHubic',
-                         params=payload)
-        Storage_Url = b64decode(r.json()['answer']['credentials']['username'])
-        Auth_Token = r.json()['answer']['credentials']['secret']
-        return Storage_Url, Auth_Token
-
-    def logout(self):
-        params = { 'sessionId': self.sessionId}
-        payload = {'params': json.dumps(params)}
-        r = requests.get(self.SessionHandler + 'rest.dispatcher/' + 'logout',
-                         params=payload)
-
-if (len(sys.argv) < 4):
-	print "usage: script user password file"
-	sys.exit(1)
-
-user = sys.argv[1]
-passwd = sys.argv[2]
-hubic = auth_hubic(user, passwd)
-storage_url, auth_token = hubic.get_credentials()
-
-options = {'auth_token': auth_token,
-           'object_storage_url': storage_url}
-conn = Connection(os_options=options, auth_version=2)
-
-conn.put_object("default/", os.path.basename(sys.argv[3]), open(sys.argv[3],'rb'))
-
-hubic.logout()
+conn = get_credentials(sys.argv[1], sys.argv[2], sys.argv[3])
+conn.put_object("default/", os.path.basename(sys.argv[4]), open(sys.argv[4]))
