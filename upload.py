@@ -10,8 +10,8 @@ import base64
 
 session = requests.session()
 
-def get_access_token(client_id, client_secret, refresh_token):
 
+def get_access_token(client_id, client_secret, refresh_token):
     # Fix headers
     credentials = '%s:%s' % (client_id, client_secret)
     encoded_credentials = base64.b64encode(credentials)
@@ -33,21 +33,23 @@ def get_access_token(client_id, client_secret, refresh_token):
 
 
 def get_open_stack_credentials(access_token):
-    # Fix authentification headers
-    session.headers.update({'Authorization': 'Bearer %s' % access_token})
+    for i in range(0, 10):
+        # Fix authentification headers
+        session.headers.update({'Authorization': 'Bearer %s' % access_token})
 
-    # Call api
-    url = 'https://api.hubic.com/1.0/account/credentials'
-    r = session.get(url)
-    if r.status_code == 200:
-        import json
-        data = json.loads(r.content)
-        return data
-    else:
-        raise Exception('Got status_code %d in getOpenStackCredentials on url %s. Reason: %s' %
-                        (r.status_code, url, r.text))
+        # Call api
+        url = 'https://api.hubic.com/1.0/account/credentials'
+        r = session.get(url)
+        if r.status_code == 200:
+            data = json.loads(r.content)
+            return data
+        else:
+            last_error = 'Got status_code %d in getOpenStackCredentials on url %s. Reason: %s' % \
+                         (r.status_code, url, r.text)
+    print last_error
 
-def get_credentials(client_id, client_secret,refresh_token):
+
+def get_credentials(client_id, client_secret, refresh_token):
     access_token = get_access_token(
         client_id=client_id,
         client_secret=client_secret,
@@ -65,6 +67,7 @@ def get_credentials(client_id, client_secret,refresh_token):
 
     conn = Connection(**conn_kwargs)
     return conn
+
 
 if len(sys.argv) < 6:
     print "Wrong args. Use: client_id client_secret refresh_token out_path file"
