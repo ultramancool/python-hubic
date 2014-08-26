@@ -66,8 +66,8 @@ def get_credentials(client_id, client_secret,refresh_token):
     conn = Connection(**conn_kwargs)
     return conn
 
-if len(sys.argv) < 5:
-    print "Wrong args. Use: client_id client_secret refresh_token"
+if len(sys.argv) < 6:
+    print "Wrong args. Use: client_id client_secret refresh_token out_path file"
 
 conn = get_credentials(sys.argv[1], sys.argv[2], sys.argv[3])
-conn.put_object("default/", os.path.basename(sys.argv[4]), open(sys.argv[4]))
+conn.put_object(None, sys.argv[4] + os.path.basename(sys.argv[5]), open(sys.argv[5], "rb"))
