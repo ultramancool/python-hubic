@@ -7,6 +7,7 @@ import sys
 import os
 from swiftclient import Connection
 import base64
+import time
 
 session = requests.session()
 
@@ -64,6 +65,7 @@ def get_credentials(client_id, client_secret,refresh_token):
             lastExc = e
         if lastExc is None:
             break
+        time.sleep(5)
     if lastExc is not None: raise lastExc
 
     conn_kwargs = {}
